@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Орел чи Решка | 3D Монета</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Segoe UI', 'Arial', sans-serif;
+            background-color: #0a0f1e;
+        }
+        #info {
+            position: absolute;
+            top: 20px;
+            left: 0;
+            width: 100%;
+            text-align: center;
+            color: white;
+            text-shadow: 0 0 20px rgba(0,0,0,0.8);
+            pointer-events: none;
+            z-index: 10;
+        }
+        #info h1 {
+            font-size: 3rem;
+            margin: 0;
+            letter-spacing: 4px;
+            font-weight: 600;
+            background: linear-gradient(135deg, #ffd700, #ffaa00);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 2px 10px rgba(255,215,0,0.3);
+        }
+        #result {
+            font-size: 2rem;
+            margin-top: 10px;
+            font-weight: bold;
+            min-height: 3rem;
+            color: #f0e6d2;
+            text-shadow: 0 0 15px #000;
+            transition: 0.3s;
+        }
+        #controls {
+            position: absolute;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 20;
+            display: flex;
+            gap: 20px;
+            background: rgba(20, 30, 45, 0.7);
+            backdrop-filter: blur(10px);
+            padding: 15px 30px;
+            border-radius: 60px;
+            border: 1px solid rgba(255,215,0,0.3);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        button {
+            background: linear-gradient(145deg, #2a3a4a, #1a2530);
+            border: none;
+            color: #ffd966;
+            font-size: 1.8rem;
+            font-weight: bold;
+            padding: 15px 40px;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 8px 0 #0f151c, 0 4px 15px rgba(0,0,0,0.5);
+            border: 1px solid #ffd70055;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            transition: all 0.08s ease;
+            text-shadow: 0 2px 5px black;
+        }
+        button:hover {
+            background: linear-gradient(145deg, #3a4a5a, #2a3545);
+            color: #ffea9e;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 0 #0f151c, 0 6px 20px black;
+        }
+        button:active {
+            transform: translateY(6px);
+            box-shadow: 0 4px 0 #0f151c, 0 4px 15px black;
+        }
+        button:disabled {
+            opacity: 0.6;
+            transform: translateY(4px);
+            box-shadow: 0 4px 0 #0f151c, 0 2px 10px black;
+            cursor: not-allowed;
+        }
+        #stats {
+            position: absolute;
+            bottom: 40px;
+            right: 40px;
+            z-index: 15;
+            color: #ccc;
+            background: rgba(0,0,0,0.4);
+            padding: 15px 25px;
+            border-radius: 40px;
+            backdrop-filter: blur(5px);
+            font-size: 1.3rem;
+            border-left: 4px solid gold;
+            text-align: right;
+            box-shadow: 0 4px 20px black;
+        }
+        #stats span {
+            color: gold;
+            font-weight: bold;
+        }
+        #hint {
+            position: absolute;
+            bottom: 120px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #aaa;
+            font-size: 1rem;
+            z-index: 25;
+            background: rgba(0,0,0,0.3);
+            padding: 5px 20px;
+            border-radius: 30px;
+            backdrop-filter: blur(4px);
+            pointer-events: none;
+        }
+        @media (max-width: 600px) {
+            #info h1 { font-size: 2.2rem; }
+            #result { font-size: 1.5rem; }
+            button { font-size: 1.4rem; padding: 12px 25px; }
+            #stats { font-size: 1rem; padding: 10px 18px; }
+        }
+    </style>
+</head>
+<body>
+    <div id="info">
+        <h1>🪙 ОРЕЛ ЧИ РЕШКА</h1>
+        <div id="result">Натисни "Підкинути"</div>
+    </div>
+    <div id="stats">
+        <div>🦅 Орел: <span id="heads-count">0</span></div>
+        <div>👑 Решка: <span id="tails-count">0</span></div>
+        <div style="margin-top:8px; font-size:1rem;">⚡ Всього: <span id="total-count">0</span></div>
+    </div>
+    <div id="controls">
+        <button id="flip-btn">Підкинути</button>
+    </div>
+    <div id="hint">✨ Крути монету мишкою (затисни ліву кнопку) | Справжня 3D модель ✨</div>
+
+    <!-- Підключаємо Three.js та доповнення -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.128.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.128.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+
+        // --- Ініціалізація сцени ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color('#0a0f1e');
+        
+        // --- Камера ---
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(3, 2, 6);
+        camera.lookAt(0, 0.5, 0);
+
+        // --- Рендерери ---
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        document.body.appendChild(renderer.domElement);
+
+        // CSS2 Renderer для тексту (опційно, але ми використаємо для красивого підпису)
+        const labelRenderer = new CSS2DRenderer();
+        labelRenderer.setSize(window.innerWidth, window.innerHeight);
+        labelRenderer.domElement.style.position = 'absolute';
+        labelRenderer.domElement.style.top = '0px';
+        labelRenderer.domElement.style.left = '0px';
+        labelRenderer.domElement.style.pointerEvents = 'none';  // щоб не заважало клікам
+        document.body.appendChild(labelRenderer.domElement);
+
+        // --- OrbitControls (для огляду) ---
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.autoRotate = false;
+        controls.enableZoom = true;
+        controls.enablePan = false;
+        controls.maxPolarAngle = Math.PI / 2.2;
+        controls.minDistance = 3.5;
+        controls.maxDistance = 9;
+        controls.target.set(0, 0.8, 0);
+
+        // --- Освітлення ---
+        // Ambient
+        scene.add(new THREE.AmbientLight(0x404060, 0.45));
+        
+        // Ключове світло
+        const keyLight = new THREE.PointLight(0xffeedd, 1.2);
+        keyLight.position.set(3, 5, 4);
+        keyLight.castShadow = true;
+        keyLight.shadow.mapSize.width = 1024;
+        keyLight.shadow.mapSize.height = 1024;
+        keyLight.shadow.bias = -0.0005;
+        scene.add(keyLight);
+        
+        // Заповнююче світло
+        const fillLight = new THREE.PointLight(0x4466cc, 0.8);
+        fillLight.position.set(-3, 3, 2);
+        scene.add(fillLight);
+        
+        // Контрове світло
+        const backLight = new THREE.PointLight(0xffaa66, 0.6);
+        backLight.position.set(0, 3, -5);
+        scene.add(backLight);
+        
+        // Підсвітка знизу
+        const bottomLight = new THREE.PointLight(0x335577, 0.4);
+        bottomLight.position.set(0, -1, 2);
+        scene.add(bottomLight);
+        
+        // Додаткове точкове світло для блиску
+        const rimLight = new THREE.PointLight(0xffcc99, 0.7);
+        rimLight.position.set(-2, 2.5, 5);
+        scene.add(rimLight);
+
+        // --- Створення текстур для монети (Canvas) ---
+        function createHeadsTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 1024;
+            canvas.height = 1024;
+            const ctx = canvas.getContext('2d');
+            
+            // Градієнт фону
+            const grad = ctx.createRadialGradient(512, 512, 0, 512, 512, 512);
+            grad.addColorStop(0, '#f5d742');
+            grad.addColorStop(0.5, '#d4af37');
+            grad.addColorStop(1, '#b8860b');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, 1024, 1024);
+            
+            // Обідок
+            ctx.strokeStyle = '#8b6508';
+            ctx.lineWidth = 40;
+            ctx.beginPath();
+            ctx.arc(512, 512, 470, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.strokeStyle = '#f0c040';
+            ctx.lineWidth = 15;
+            ctx.beginPath();
+            ctx.arc(512, 512, 450, 0, Math.PI * 2);
+            ctx.stroke();
+            
+            // Зображення орла (стилізоване)
+            ctx.fillStyle = '#3a2a0a';
+            ctx.shadowColor = '#00000055';
+            ctx.shadowBlur = 20;
+            
+            // Орел - малюємо простий силует
+            ctx.font = 'bold 500px "Segoe UI", "Arial Unicode MS", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('🦅', 512, 480);
+            
+            ctx.shadowBlur = 0;
+            ctx.font = 'bold 120px "Segoe UI", sans-serif';
+            ctx.fillStyle = '#2c1e05';
+            ctx.fillText('ОРЕЛ', 512, 820);
+            
+            // Декоративні зірки
+            ctx.fillStyle = '#ffd700';
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = '#ffaa00';
+            for (let i = 0; i < 12; i++) {
+                const angle = (i * 30) * Math.PI / 180;
+                const x = 512 + Math.cos(angle) * 380;
+                const y = 512 + Math.sin(angle) * 380;
+                ctx.beginPath();
+                ctx.arc(x, y, 18, 0, 2*Math.PI);
+                ctx.fill();
+            }
+            
+            return new THREE.CanvasTexture(canvas);
+        }
+
+        function createTailsTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 1024;
+            canvas.height = 1024;
+            const ctx = canvas.getContext('2d');
+            
+            const grad = ctx.createRadialGradient(512, 512, 0, 512, 512, 512);
+            grad.addColorStop(0, '#e0c070');
+            grad.addColorStop(0.6, '#c5a030');
+            grad.addColorStop(1, '#9e7b1a');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, 1024, 1024);
+            
+            // Обідок
+            ctx.strokeStyle = '#6b4e0a';
+            ctx.lineWidth = 40;
+            ctx.beginPath();
+            ctx.arc(512, 512, 470, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.strokeStyle = '#eebb33';
+            ctx.lineWidth = 15;
+            ctx.beginPath();
+            ctx.arc(512, 512, 450, 0, Math.PI * 2);
+            ctx.stroke();
+            
+            // Решка - корона або символ
+            ctx.fillStyle = '#2e2208';
+            ctx.shadowColor = '#00000066';
+            ctx.shadowBlur = 25;
+            ctx.font = 'bold 480px "Segoe UI", "Arial Unicode MS", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('👑', 512, 480);
+            
+            ctx.shadowBlur = 0;
+            ctx.font = 'bold 120px "Segoe UI", sans-serif';
+            ctx.fillStyle = '#2c1e05';
+            ctx.fillText('РЕШКА', 512, 820);
+            
+            // Візерунок
+            ctx.fillStyle = '#d4af37';
+            ctx.shadowBlur = 12;
+            for (let i = 0; i < 8; i++) {
+                const angle = (i * 45) * Math.PI / 180;
+                const x = 512 + Math.cos(angle) * 350;
+                const y = 512 + Math.sin(angle) * 350;
+                ctx.beginPath();
+                ctx.arc(x, y, 20, 0, 2*Math.PI);
+                ctx.fill();
+            }
+            
+            return new THREE.CanvasTexture(canvas);
+        }
+
+        const headsTexture = createHeadsTexture();
+        const tailsTexture = createTailsTexture();
+        
+        // Текстура для ребра монети
+        const edgeCanvas = document.createElement('canvas');
+        edgeCanvas.width = 256;
+        edgeCanvas.height = 256;
+        const eCtx = edgeCanvas.getContext('2d');
+        eCtx.fillStyle = '#b8860b';
+        eCtx.fillRect(0, 0, 256, 256);
+        eCtx.strokeStyle = '#f5d742';
+        eCtx.lineWidth = 8;
+        for (let i=0; i<256; i+=16) {
+            eCtx.beginPath();
+            eCtx.moveTo(i, 0);
+            eCtx.lineTo(i+8, 256);
+            eCtx.stroke();
+        }
+        const edgeTexture = new THREE.CanvasTexture(edgeCanvas);
+
+        // --- Створення монети ---
+        const coinGroup = new THREE.Group();
+        
+        // Матеріали: bottom (решка), top (орел), side
+        const materials = [
+            new THREE.MeshStandardMaterial({ map: tailsTexture, roughness: 0.3, metalness: 0.7, emissive: new THREE.Color(0x111100), emissiveIntensity: 0.1 }),
+            new THREE.MeshStandardMaterial({ map: headsTexture, roughness: 0.3, metalness: 0.7, emissive: new THREE.Color(0x221100), emissiveIntensity: 0.1 }),
+            new THREE.MeshStandardMaterial({ map: edgeTexture, roughness: 0.4, metalness: 0.6, color: 0xccaa55 })
+        ];
+        
+        const geometry = new THREE.CylinderGeometry(1.4, 1.4, 0.15, 128);
+        const coin = new THREE.Mesh(geometry, materials);
+        coin.castShadow = true;
+        coin.receiveShadow = true;
+        coinGroup.add(coin);
+        
+        // Додамо тонкий обідок для реалістичності
+        const rimGeo = new THREE.TorusGeometry(1.41, 0.025, 32, 200);
+        const rimMat = new THREE.MeshStandardMaterial({ color: 0xffdd77, roughness: 0.25, metalness: 0.8 });
+        const rim = new THREE.Mesh(rimGeo, rimMat);
+        rim.rotation.x = Math.PI / 2;
+        rim.position.y = 0;
+        rim.receiveShadow = false;
+        coinGroup.add(rim);
+        
+        const rim2 = rim.clone();
+        rim2.position.y = 0.075;
+        coinGroup.add(rim2);
+        const rim3 = rim.clone();
+        rim3.position.y = -0.075;
+        coinGroup.add(rim3);
+        
+        coinGroup.position.y = 0.9;
+        scene.add(coinGroup);
+
+        // --- Підставка / стіл ---
+        const tableMat = new THREE.MeshStandardMaterial({ 
+            color: 0x1a3a2a, 
+            roughness: 0.7, 
+            metalness: 0.1,
+            emissive: new THREE.Color(0x0a1a0a),
+            emissiveIntensity: 0.2
+        });
+        const table = new THREE.Mesh(new THREE.CylinderGeometry(4.5, 4.5, 0.3, 64), tableMat);
+        table.position.y = -0.15;
+        table.receiveShadow = true;
+        table.castShadow = false;
+        scene.add(table);
+        
+        // Окантовка столу
+        const tableEdge = new THREE.Mesh(new THREE.TorusGeometry(4.5, 0.05, 16, 100), new THREE.MeshStandardMaterial({ color: 0xcdb38c, roughness: 0.5, metalness: 0.2 }));
+        tableEdge.rotation.x = Math.PI / 2;
+        tableEdge.position.y = 0.02;
+        tableEdge.receiveShadow = true;
+        scene.add(tableEdge);
+        
+        // Декоративне сукно
+        const feltMat = new THREE.MeshStandardMaterial({ color: 0x1e4d2e, roughness: 0.9 });
+        const felt = new THREE.Mesh(new THREE.CylinderGeometry(3.8, 3.8, 0.05, 64), feltMat);
+        felt.position.y = 0.18;
+        felt.receiveShadow = true;
+        scene.add(felt);
+        
+        // Підсвітка знизу столу
+        const underLight = new THREE.PointLight(0x335533, 0.5);
+        underLight.position.set(0, -0.3, 0);
+        scene.add(underLight);
+
+        // --- Фон та атмосфера ---
+        // Зірки / частинки
+        const starsGeometry = new THREE.BufferGeometry();
+        const starsCount = 800;
+        const starPositions = new Float32Array(starsCount * 3);
+        for (let i = 0; i < starsCount * 3; i+=3) {
+            starPositions[i] = (Math.random() - 0.5) * 200;
+            starPositions[i+1] = (Math.random() - 0.5) * 100;
+            starPositions[i+2] = (Math.random() - 0.5) * 200;
+        }
+        starsGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+        const starsMaterial = new THREE.PointsMaterial({color: 0xffffff, size: 0.15, transparent: true});
+        const stars = new THREE.Points(starsGeometry, starsMaterial);
+        scene.add(stars);
+
+        // --- Логіка гри ---
+        let headsCount = 0;
+        let tailsCount = 0;
+        let totalFlips = 0;
+        let isFlipping = false;
+        let flipStartTime = 0;
+        const flipDuration = 1800; // ms
+        
+        const resultDiv = document.getElementById('result');
+        const headsSpan = document.getElementById('heads-count');
+        const tailsSpan = document.getElementById('tails-count');
+        const totalSpan = document.getElementById('total-count');
+        const flipBtn = document.getElementById('flip-btn');
+        
+        let targetRotationX = 0;
+        let startRotationX = 0;
+        let flipResult = 'heads'; // 'heads' або 'tails'
+        
+        // Додаткові оберти для ефекту
+        const extraSpins = 6; // кількість повних обертів
+        
+        function updateStats() {
+            headsSpan.textContent = headsCount;
+            tailsSpan.textContent = tailsCount;
+            totalSpan.textContent = totalFlips;
+        }
+        
+        function showResultText(result) {
+            if (result === 'heads') {
+                resultDiv.innerHTML = '🦅 Випав ОРЕЛ! 🦅';
+                resultDiv.style.color = '#ffd966';
+            } else {
+                resultDiv.innerHTML = '👑 Випала РЕШКА! 👑';
+                resultDiv.style.color = '#eebb55';
+            }
+        }
+        
+        function flipCoin() {
+            if (isFlipping) return;
+            
+            // Визначаємо результат
+            const rand = Math.random();
+            flipResult = rand < 0.5 ? 'heads' : 'tails';
+            
+            // Оновлюємо лічильники
+            totalFlips++;
+            if (flipResult === 'heads') {
+                headsCount++;
+            } else {
+                tailsCount++;
+            }
+            updateStats();
+            
+            // Анімація
+            isFlipping = true;
+            flipBtn.disabled = true;
+            flipStartTime = performance.now();
+            
+            startRotationX = coinGroup.rotation.x;
+            // Нормалізуємо початковий кут
+            const baseRot = startRotationX % (Math.PI * 2);
+            
+            // Бажане кінцеве положення: для орла - щоб верхня грань (індекс 1) була вгорі (0 або 2pi), для решки - перевернута (PI)
+            const targetBase = flipResult === 'heads' ? 0 : Math.PI;
+            
+            // Додаємо кратні оберти, щоб зберегти напрямок
+            let delta = targetBase - baseRot;
+            // Вибираємо найкоротший шлях
+            if (delta > Math.PI) delta -= 2 * Math.PI;
+            if (delta < -Math.PI) delta += 2 * Math.PI;
+            
+            // Додаємо додаткові оберти (6 повних обертів)
+            const extra = extraSpins * 2 * Math.PI * (flipResult === 'heads' ? 1 : -1);
+            targetRotationX = startRotationX + delta + extra;
+            
+            // Невелике підкидання по Y
+            // (буде в анімації)
+        }
+        
+        flipBtn.addEventListener('click', flipCoin);
+        
+        // --- Анімація ---
+        function animateFlip(now) {
+            if (!isFlipping) return;
+            
+            const elapsed = now - flipStartTime;
+            let progress = Math.min(elapsed / flipDuration, 1);
+            
+            // Easing: easeOutCubic
+            const ease = 1 - Math.pow(1 
